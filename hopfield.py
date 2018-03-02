@@ -51,12 +51,13 @@ def network_recall_sync(pattern, W, attractor):
         # print(energy)
         # plt.figure()
         # plt.imshow(local_pattern.reshape(im_size, im_size))
-        # plt.show()w
+        # plt.show()
+        local_pattern = vect_sign((W @ local_pattern))
         if energy == old_energy:
             # print("Number of iterations for stability: {}".format(count))
             # print("Energy at stability: {}".format(energy))
             return local_pattern, count
-        local_pattern = vect_sign((W @ local_pattern))
+
         old_energy = energy
         count += 1
 
@@ -179,35 +180,38 @@ if __name__ == '__main__':
     sign = np.vectorize(sign)
     N = len(patterns[0])
     W_rand = np.zeros((N,N))
-    n_noise = 10
+    di = np.diag_indices(N)
+    n_noise = 5
     stable_patterns_percent = []
     stable_patterns_percent_noise = []
-    stable_patterns = []
     for i, pattern in enumerate(patterns):
-        print("Learning pattern: {}".format(i))
+        if i%10 == 0:
+            print("Learning pattern: {}".format(i))
         W_rand += np.outer(pattern, pattern)
+        # W_rand[di] = 0
+        W_rand *= 1/N
         stable = 0
         stable_noise = 0
         for j in range(i+1):
-            print("Recall pattern no: {}".format(j))
+            # print("Recall pattern no: {}".format(j))
             noisy_pat = distort_pattern(patterns[j], n_noise)
             recall_noise, count_noise = network_recall_sync(noisy_pat, W_rand, patterns[j])
-            recall, count= network_recall_sync(patterns[j], W_rand, patterns[j])
-            if count == 1:
-                stable+=1
+            # recall, count= network_recall_sync(patterns[j], W_rand, patterns[j])
+            # if count == 1:
+            #     stable+=1
             if count_noise == 1:
                 stable_noise +=1
-        stable_patterns.append(stable)
-        stable_patterns_percent.append(stable/(i+1))
+        # stable_patterns_percent.append(stable/(i+1))
         stable_patterns_percent_noise.append(stable_noise/(i+1))
 
-    print(stable_patterns)
-    print(stable_patterns_percent)
-    print(stable_patterns_percent_noise)
-    plt.figure()
-    plt.plot(stable_patterns)
-    plt.figure()
-    plt.plot(stable_patterns_percent)
+    # plt.figure()
+    # plt.plot(stable_patterns_percent)
+    # plt.title("Clean patterns")
+    # plt.xlabel("Number of stored patterns")
+    # plt.ylabel("Percentage of stable patterns")
     plt.figure()
     plt.plot(stable_patterns_percent_noise)
+    plt.title("Noisy patterns, {} flipped units".format(n_noise))
+    plt.xlabel("Number of stored patterns")
+    plt.ylabel("Percentage of stable patterns")
     plt.show()
