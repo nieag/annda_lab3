@@ -253,9 +253,10 @@ def assignment3_5_2():
     X_rand = []
     performance = []
     total_performance = []
+    iterations = 5
 
     for i in range(noOfPatterns):
-        mask = list(sign(0.5+randn(300,100)))
+        mask = list(sign(np.random.randn(300,100)))
     print(len(X_rand))
 
     for i in range(1,len(X_rand)+1):
@@ -265,9 +266,12 @@ def assignment3_5_2():
         for n in range(0,i):
             #print(n)
             x_temp = np.copy(X_rand[n])
-            x_temp = recall(x_temp,W)
-            if (np.sum(x_temp-X_rand[n]) == 0):
-                noOfRecalled+=1
+            x_temp = addNoise(x_temp,0.2)
+            x_prev = np.copy(x_temp)
+            for t in range(iterations):
+                x_temp = recall(x_temp,W)
+                if np.all(x_temp == x_prev):
+                    noOfRecalled+=1
         performance.append(noOfRecalled)
 
     performance_norm = np.divide(performance, np.arange(noOfPatterns)+1)
@@ -291,13 +295,13 @@ def assignment3_5_2():
     plt.title("Number of patterns stored normalised on patters learned")
     plt.ylabel("Fraction of patterns recalled")
     plt.xlabel("# of patterns learned")
-    fig.savefig("recalled_patterns.png")
+    fig.savefig("test.png")
 
 def assignment3_5_2_extra():
     noOfUnits = 100
     noOfPatterns = 300
 
-    iterations = 100
+    iterations = 1
     total_performance = []
     total_performance_norm = []
 
@@ -353,5 +357,5 @@ if __name__ == '__main__':
     #assignment3_3()
     #assignment3_4()
     #assignment3_5()
-    #assignment3_5_2()
+    assignment3_5_2()
     #assignment3_5_2_extra()
