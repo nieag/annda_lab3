@@ -14,6 +14,12 @@ def sign(x):
     else:
         return 1
 
+def sign_binary(x):
+    if x<=0:
+        return 0
+    else:
+        return 1
+
 def plot_recall(no_noise, noisy, recall):
         plt.figure()
         plt.subplot(131)
@@ -26,10 +32,14 @@ def plot_recall(no_noise, noisy, recall):
         plt.imshow(recall.reshape(32,32))
         plt.title("Recalled")
 
-def generate_random_patterns(size, n_patterns):
+def generate_random_patterns(size, n_patterns, pattern_type="bipolar", bias=0):
     rand_patterns = []
-    for i in range(n_patterns):
-        rand_patterns.append(np.squeeze(np.random.choice([-1, 1], size)))
+    if pattern_type=="bipolar":
+        for i in range(n_patterns):
+            rand_patterns.append(np.squeeze(np.random.choice([-1, 1], size))+bias)
+    else:
+        for i in range(n_patterns):
+            rand_patterns.append(np.squeeze(np.random.choice([0, 1], size))+bias)
     rand_patterns = np.asarray(rand_patterns)
     return rand_patterns
 
@@ -40,24 +50,34 @@ def learn_patterns(patterns):
         W += np.outer(pattern, pattern)
     return W
 
+def learn_pattern_sparse(pattern, activity, scale):
+    # Learns only one pattern at a time
+    N = len(pattern)
+    di = np.diag_indices(N)
+    W = np.outer(pattern-activity, pattern-activity)
+    # W[di] = 0
+    return W*scale
+
 def network_recall_sync(pattern, W, attractor):
     local_pattern = np.copy(pattern)
     count = 0
-    old_energy = 0
+    old_energy = energy_func(W, local_pattern)
     im_size = int(np.sqrt(len(pattern)))
     vect_sign = np.vectorize(sign)
+    # plt.figure()
+    # plt.imshow(local_pattern.reshape(im_size, im_size))
+    # plt.show()
     while True:
+        local_pattern = vect_sign((W @ local_pattern))
         energy = energy_func(W, local_pattern)
         # print(energy)
         # plt.figure()
         # plt.imshow(local_pattern.reshape(im_size, im_size))
         # plt.show()
-        local_pattern = vect_sign((W @ local_pattern))
         if energy == old_energy:
             # print("Number of iterations for stability: {}".format(count))
             # print("Energy at stability: {}".format(energy))
             return local_pattern, count
-
         old_energy = energy
         count += 1
 
@@ -82,13 +102,31 @@ def network_recall_async(pattern, W, attractor):
             return local_pattern
         count += 1
 
+def sparse_recall_sync(pattern, attractor, W, theta):
+    local_pattern = np.copy(pattern)
+    count = 0
+    att_energy = energy_func(W, attractor)
+    im_size = int(np.sqrt(len(pattern)))
+    vect_sign = np.vectorize(sign)
+    while True:
+        local_pattern = 0.5 + 0.5*vect_sign((W @ local_pattern) - theta)
+        energy = energy_func(W, local_pattern)
+        if energy == att_energy:
+            # print("Number of iterations for stability: {}".format(count))
+            # print("Energy at stability: {}".format(energy))
+            return local_pattern, count
+        elif count == 10:
+            # print("Not converged")
+            return None, count
+        count += 1
+
 def energy_func(W, pattern):
     E = -np.dot(np.dot(pattern, W), pattern)
     return E
 
-def distort_pattern(pattern, n_noise):
+def distort_pattern(pattern, change, n_noise):
     local_pattern = np.copy(pattern)
-    local_pattern[np.random.permutation(range(len(local_pattern)))[:n_noise]]*=-1
+    local_pattern[np.random.permutation(range(len(local_pattern)))[:n_noise]]*=change
     return local_pattern
 
 if __name__ == '__main__':
@@ -176,42 +214,79 @@ if __name__ == '__main__':
     # plt.show()
 
     """Random patterns"""
-    patterns = generate_random_patterns(100, 300)
-    sign = np.vectorize(sign)
-    N = len(patterns[0])
-    W_rand = np.zeros((N,N))
-    di = np.diag_indices(N)
-    n_noise = 5
-    stable_patterns_percent = []
-    stable_patterns_percent_noise = []
-    for i, pattern in enumerate(patterns):
-        if i%10 == 0:
-            print("Learning pattern: {}".format(i))
-        W_rand += np.outer(pattern, pattern)
-        # W_rand[di] = 0
-        W_rand *= 1/N
-        stable = 0
-        stable_noise = 0
-        for j in range(i+1):
-            # print("Recall pattern no: {}".format(j))
-            noisy_pat = distort_pattern(patterns[j], n_noise)
-            recall_noise, count_noise = network_recall_sync(noisy_pat, W_rand, patterns[j])
-            # recall, count= network_recall_sync(patterns[j], W_rand, patterns[j])
-            # if count == 1:
-            #     stable+=1
-            if count_noise == 1:
-                stable_noise +=1
-        # stable_patterns_percent.append(stable/(i+1))
-        stable_patterns_percent_noise.append(stable_noise/(i+1))
-
+    # patterns = generate_random_patterns(100, 300)
+    # sign = np.vectorize(sign)
+    # N = len(patterns[0])
+    # W_rand = np.zeros((N,N))
+    # di = np.diag_indices(N)
+    # n_noise = 5
+    # stable_patterns_percent = []
+    # stable_patterns_percent_noise = []
+    # for i, pattern in enumerate(patterns):
+    #     if i%10 == 0:
+    #         print("Learning pattern: {}".format(i))
+    #     W_rand += np.outer(pattern, pattern)
+    #     W_rand[di] = 0
+    #     W_rand *= 1/N
+    #     stable = 0
+    #     stable_noise = 0
+    #     for j in range(i+1):
+    #         # print("Recall pattern no: {}".format(j))
+    #         noisy_pat = distort_pattern(patterns[j], n_noise)
+    #         recall_noise, count_noise = network_recall_sync(noisy_pat, W_rand, patterns[j])
+    #         recall, count= network_recall_sync(patterns[j], W_rand, patterns[j])
+    #         if count == 0:
+    #             stable+=1
+    #         if count_noise == 0:
+    #             stable_noise +=1
+    #     stable_patterns_percent.append(stable/(i+1))
+    #     stable_patterns_percent_noise.append(stable_noise/(i+1))
+    #
     # plt.figure()
     # plt.plot(stable_patterns_percent)
     # plt.title("Clean patterns")
     # plt.xlabel("Number of stored patterns")
     # plt.ylabel("Percentage of stable patterns")
-    plt.figure()
-    plt.plot(stable_patterns_percent_noise)
-    plt.title("Noisy patterns, {} flipped units".format(n_noise))
-    plt.xlabel("Number of stored patterns")
-    plt.ylabel("Percentage of stable patterns")
-    plt.show()
+    # plt.savefig("clean_patterns_0_diag.png", dpi="figure", format="png")
+    # plt.figure()
+    # plt.plot(stable_patterns_percent_noise)
+    # plt.title("Noisy patterns, {} flipped units".format(n_noise))
+    # plt.xlabel("Number of stored patterns")
+    # plt.ylabel("Percentage of stable patterns")
+    # plt.savefig("noisy_patterns_{}_flipped_units_0_diag.png".format(n_noise), dpi="figure", format="png")
+    # plt.show()
+
+    """Sparse patterns"""
+    # patterns = np.ones((300, 100))
+    # patterns_sparse = []
+    # N = len(patterns[0])
+    # thetas = [0.001, 0.01, 0.1, 1, 2, 4, 8, 10, 15, 20]
+    # activity = 0.01
+    # n_stored = []
+    # for pattern in patterns:
+    #     patterns_sparse.append(distort_pattern(pattern, 0, int(N*(1-activity))))
+    # # print(patterns_sparse[0])
+    # # W = learn_pattern_sparse(patterns_sparse[0], activity, 1)
+    # # recall, count = sparse_recall_sync(patterns_sparse[0], patterns_sparse[0], W, 1)
+    # # print(recall)
+    # W = np.zeros((N,N))
+    # for pattern in patterns_sparse:
+    #     W += learn_pattern_sparse(pattern, activity, 1)
+    # for theta in thetas:
+    #     stored_OK = 0
+    #     for i, pattern in enumerate(patterns_sparse):
+    #         recall, count = sparse_recall_sync(pattern, pattern, W, theta)
+    #         if recall is not None:
+    #             stored_OK += 1
+    #     n_stored.append(stored_OK)
+    # print(n_stored)
+    # x = np.arange(len(thetas))
+    # plt.figure()
+    # plt.bar(x, n_stored, align="edge", width=0.3)
+    # plt.xticks(x, thetas)
+    # plt.ylim((0, 300))
+    # plt.ylabel("Number of patterns stored")
+    # plt.xlabel("Theta")
+    # plt.title("Number of patterns stored, activity: {}".format(activity))
+    # plt.savefig("sparse_p_{}_theta_0.001-20.png".format(activity), dpi="figure", format="png")
+    # plt.show()
