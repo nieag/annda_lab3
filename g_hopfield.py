@@ -253,11 +253,11 @@ def assignment3_5_2():
     X_rand = []
     performance = []
     total_performance = []
-    iterations = 5
+    iterations = 10
 
     for i in range(noOfPatterns):
-        mask = list(sign(np.random.randn(300,100)))
-    print(len(X_rand))
+        mask = np.random.choice([1, -1], size=(noOfUnits,))
+        X_rand.append(mask)
 
     for i in range(1,len(X_rand)+1):
         W = compW(X_rand[:i])
@@ -266,17 +266,16 @@ def assignment3_5_2():
         for n in range(0,i):
             #print(n)
             x_temp = np.copy(X_rand[n])
-            x_temp = addNoise(x_temp,0.2)
+            #x_temp = addNoise(x_temp,0.2)
             x_prev = np.copy(x_temp)
-            for t in range(iterations):
-                x_temp = recall(x_temp,W)
-                if np.all(x_temp == x_prev):
-                    noOfRecalled+=1
+            x_temp = recall(x_temp, W)
+            if np.all(x_temp == x_prev):
+                noOfRecalled+=1
         performance.append(noOfRecalled)
 
     performance_norm = np.divide(performance, np.arange(noOfPatterns)+1)
     print(performance)
-    print(performance_norm)
+    #print(performance_norm)
 
     cat_forgetting_limit = noOfUnits*0.18
 
