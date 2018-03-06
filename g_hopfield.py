@@ -22,11 +22,11 @@ def generateData():
 def generateNoisyData():
     return [[1, -1, 1, -1, 1, -1, -1, 1], [1, 1, -1, -1, -1, 1, -1, -1], [1, 1, 1, -1, 1, 1, -1, 1]]
 
-def compW(X,N=1024):
-    Id = np.eye(len(X[0]))
+def compW(X,N=1024, zeroDiag=None):
+    Id = 1-np.eye(len(X[0]))
     W = np.zeros((len(X[0]),len(X[0])))
     for x in X:
-        W += (np.outer(x,x))/N
+        W += np.outer(x,x)
     return W
 
 def recallAll(X,W):
@@ -115,6 +115,18 @@ def addNoise(img, noiseLevel):
     mask = np.random.choice([-1, 1], size=(len(img),), p=[noiseLevel, 1-noiseLevel])
     return np.multiply(img,mask)
 
+def compW2(X, N,P):
+    ro = (1/(N*P))*np.sum(X)
+    W = np.zeros((len(X[0]),len(X[0])))
+    Id = 1-np.eye(len(X[0]))
+
+    for x in X:
+        W += np.outer(x-ro,x-ro)
+    return W
+
+def recall2(X, W, bias):
+    x = 0.5 + 0.5*sign((W@X) -bias)
+    return x
 
 #------------------------------------------------------------
 def assignment3_0():
@@ -252,29 +264,26 @@ def assignment3_5_2():
     noOfPatterns = 300
     X_rand = []
     performance = []
-    total_performance = []
-    iterations = 10
+    bias = 0.75
 
     for i in range(noOfPatterns):
-        mask = np.random.choice([1, -1], size=(noOfUnits,))
+        mask = np.random.choice([1, -1], size=(noOfUnits,), p=[bias,1-bias])
         X_rand.append(mask)
 
     for i in range(1,len(X_rand)+1):
-        W = compW(X_rand[:i])
-        #print(X_rand[:i])
+        W = compW(X_rand[:i], zeroDiag=1)
         noOfRecalled = 0
         for n in range(0,i):
-            #print(n)
             x_temp = np.copy(X_rand[n])
-            #x_temp = addNoise(x_temp,0.2)
             x_prev = np.copy(x_temp)
+            #x_temp = addNoise(x_temp,0.05)
             x_temp = recall(x_temp, W)
             if np.all(x_temp == x_prev):
                 noOfRecalled+=1
         performance.append(noOfRecalled)
 
-    performance_norm = np.divide(performance, np.arange(noOfPatterns)+1)
     print(performance)
+    performance_norm = np.divide(performance, np.arange(noOfPatterns)+1)
     #print(performance_norm)
 
     cat_forgetting_limit = noOfUnits*0.18
@@ -284,15 +293,15 @@ def assignment3_5_2():
     plt.subplot(2,1,1)
     plt.plot(performance)
     plt.axvline(x=cat_forgetting_limit, c='r')
-    plt.title("Number of patterns stored")
-    plt.ylabel("# of patterns recalled")
+    plt.title("Number of stable patterns stored")
+    plt.ylabel("# of stable patterns recalled")
     plt.xlabel("# of patterns learned")
 
     plt.subplot(2,1,2)
     plt.plot(performance_norm)
     plt.axvline(x=cat_forgetting_limit, c='r')
-    plt.title("Number of patterns stored normalised on patters learned")
-    plt.ylabel("Fraction of patterns recalled")
+    plt.title("Number of stable patterns stored normalised on patters learned")
+    plt.ylabel("Fraction of stable patterns recalled")
     plt.xlabel("# of patterns learned")
     fig.savefig("test.png")
 
@@ -348,6 +357,55 @@ def assignment3_5_2_extra():
     plt.xlabel("# of patterns learned")
     fig.savefig("recalled_patterns_mean.png")
 
+def assignment3_6():
+
+    X = []
+    noOfPatterns = 100
+    noOfUnits = 100
+    bias = 0.1
+    performance = []
+
+    for i in range(noOfPatterns):
+        x = np.random.choice([1, 0], size=(noOfUnits,), p=[bias, 1-bias])
+        X.append(x)
+
+    for i in range(1,len(X)+1):
+        W = compW2(X[:i], noOfUnits, i)
+        noOfRecalled = 0
+        for n in range(0,i):
+            x_temp = np.copy(X[n])
+            x_prev = np.copy(x_temp)
+            #x_temp = addNoise(x_temp,0.05)
+            for k in range(10):
+                x_temp = recall2(x_temp, W, bias)
+                #print(x_temp)
+                if np.sum(x_temp-x_prev) == 0:
+                    noOfRecalled+=1
+                    break
+
+        performance.append(noOfRecalled)
+
+    print(performance)
+    performance_norm = np.divide(performance, np.arange(noOfPatterns)+1)
+
+    cat_forgetting_limit = noOfUnits*0.18
+
+    fig, ax = plt.subplots(2,1, figsize=(8, 9))
+
+    plt.subplot(2,1,1)
+    plt.plot(performance)
+    plt.axvline(x=cat_forgetting_limit, c='r')
+    plt.title("Number of stable patterns stored")
+    plt.ylabel("# of stable patterns recalled")
+    plt.xlabel("# of patterns learned")
+
+    plt.subplot(2,1,2)
+    plt.plot(performance_norm)
+    plt.axvline(x=cat_forgetting_limit, c='r')
+    plt.title("Number of stable patterns stored normalised on patters learned")
+    plt.ylabel("Fraction of stable patterns recalled")
+    plt.xlabel("# of patterns learned")
+    fig.savefig("test.png")
 
 if __name__ == '__main__':
     #assignment3_0()
@@ -356,5 +414,6 @@ if __name__ == '__main__':
     #assignment3_3()
     #assignment3_4()
     #assignment3_5()
-    assignment3_5_2()
+    #assignment3_5_2()
     #assignment3_5_2_extra()
+    assignment3_6()
